@@ -11,7 +11,7 @@ use Google\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 1.1.1
+ * @version 1.1.2
  * @lastmodified 2024-10-11
  * @package Tigress\GoogleApiAuth
  */
@@ -33,7 +33,7 @@ class GoogleApiAuth
      */
     public static function version(): string
     {
-        return '1.1.1';
+        return '1.1.2';
     }
 
     /**
@@ -54,11 +54,11 @@ class GoogleApiAuth
      * @throws Exception
      */
     public function createConnection(
-        string $applicationName,
-        array  $scopes = ['https://www.googleapis.com/auth/drive'],
+        string  $applicationName,
+        array   $scopes = ['https://www.googleapis.com/auth/drive'],
         ?string $subject = null,
         ?string $accessType = 'offline',
-        string $prompt = 'select_account consent'
+        string  $prompt = 'select_account consent'
     ): void
     {
         $this->client->setApplicationName($applicationName);
@@ -83,9 +83,15 @@ class GoogleApiAuth
      *
      * @param string $applicationName
      * @param string $clientId
+     *      - The client ID of the OAuth client.
      * @param string $clientSecret
+     *      - The client secret of the OAuth client.
      * @param string $redirectUri
+     *      - The URI to redirect to after the user grants/denies permission.
      * @param array $scopes
+     *      - email
+     *      - profile
+     *      - openid
      * @return void
      */
     public function createOauth2Service(
@@ -93,7 +99,7 @@ class GoogleApiAuth
         string $clientId,
         string $clientSecret,
         string $redirectUri,
-        array $scopes = ['email', 'profile', 'openid'],
+        array  $scopes = ['email', 'profile', 'openid'],
     ): void
     {
         $this->client->setApplicationName($applicationName);
@@ -111,6 +117,48 @@ class GoogleApiAuth
     public function createAuthUrl(): string
     {
         return $this->client->createAuthUrl();
+    }
+
+    /**
+     * Fetch the access token with the authorization code.
+     *
+     * @param string $authCode
+     * @return void
+     */
+    public function fetchAccessTokenWithAuthCode(string $authCode): void
+    {
+        $this->client->fetchAccessTokenWithAuthCode($authCode);
+    }
+
+    /**
+     * Get the access token.
+     *
+     * @return array
+     */
+    public function getAccessToken(): array
+    {
+        return $this->client->getAccessToken();
+    }
+
+    /**
+     * Set the access token.
+     *
+     * @param array $accessToken
+     * @return void
+     */
+    public function setAccessToken(array $accessToken): void
+    {
+        $this->client->setAccessToken($accessToken);
+    }
+
+    /**
+     * Check if the access token is expired.
+     *
+     * @return bool
+     */
+    public function isAccessTokenExpired(): bool
+    {
+        return $this->client->isAccessTokenExpired();
     }
 
     /**
