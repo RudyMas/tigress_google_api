@@ -4,7 +4,6 @@ namespace Tigress;
 
 use Google\Client;
 use Google\Exception;
-use Google\Service\Oauth2;
 
 /**
  * Class GoogleApiAuth (PHP version 8.3)
@@ -12,7 +11,7 @@ use Google\Service\Oauth2;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 1.1.0
+ * @version 1.1.1
  * @lastmodified 2024-10-11
  * @package Tigress\GoogleApiAuth
  */
@@ -21,7 +20,6 @@ class GoogleApiAuth
     private string $authConfigPath;
     private string $credentialsPath;
     protected Client $client;
-    protected Oauth2 $oauth2;
 
     public function __construct()
     {
@@ -35,7 +33,7 @@ class GoogleApiAuth
      */
     public static function version(): string
     {
-        return '1.1.0';
+        return '1.1.1';
     }
 
     /**
@@ -103,8 +101,16 @@ class GoogleApiAuth
         $this->client->setClientSecret($clientSecret);
         $this->client->setRedirectUri($redirectUri);
         $this->client->addScope($scopes);
+    }
 
-        $this->oauth2 = new Oauth2($this->client);
+    /**
+     * Create the authorization URL.
+     *
+     * @return string
+     */
+    public function createAuthUrl(): string
+    {
+        return $this->client->createAuthUrl();
     }
 
     /**

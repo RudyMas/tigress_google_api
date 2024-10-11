@@ -8,7 +8,7 @@ namespace Tigress;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2024.10.1
+ * @version 2024.10.2
  * @lastmodified 2024-10-11
  * @package Tigress\GoogleApi
  */
@@ -22,7 +22,7 @@ class GoogleApi
     public static function version(): array
     {
         return [
-            'GoogleApi' => '2024.10.1',
+            'GoogleApi' => '2024.10.2',
             'GoogleApiAuth' => GoogleApiAuth::version(),
             'GoogleApiCalendar' => GoogleApiCalendar::version(),
             'GoogleApiDrive' => GoogleApiDrive::version(),
