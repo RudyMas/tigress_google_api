@@ -11,7 +11,7 @@ use Google\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 1.1.2
+ * @version 1.1.3
  * @lastmodified 2024-10-11
  * @package Tigress\GoogleApiAuth
  */
@@ -33,7 +33,7 @@ class GoogleApiAuth
      */
     public static function version(): string
     {
-        return '1.1.2';
+        return '1.1.3';
     }
 
     /**
@@ -116,7 +116,7 @@ class GoogleApiAuth
      */
     public function createAuthUrl(): string
     {
-        return $this->client->createAuthUrl();
+        return filter_var($this->client->createAuthUrl(), FILTER_SANITIZE_URL);
     }
 
     /**
