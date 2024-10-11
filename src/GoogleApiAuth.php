@@ -4,6 +4,7 @@ namespace Tigress;
 
 use Google\Client;
 use Google\Exception;
+use Google\Service\Oauth2;
 
 /**
  * Class GoogleApiAuth (PHP version 8.3)
@@ -11,8 +12,8 @@ use Google\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 1.0.0
- * @lastmodified 2024-10-10
+ * @version 1.1.0
+ * @lastmodified 2024-10-11
  * @package Tigress\GoogleApiAuth
  */
 class GoogleApiAuth
@@ -20,6 +21,7 @@ class GoogleApiAuth
     private string $authConfigPath;
     private string $credentialsPath;
     protected Client $client;
+    protected Oauth2 $oauth2;
 
     public function __construct()
     {
@@ -76,6 +78,33 @@ class GoogleApiAuth
         if (!is_null($prompt)) {
             $this->client->setPrompt($prompt);
         }
+    }
+
+    /**
+     * Set ip the OAuth2 service.
+     *
+     * @param string $applicationName
+     * @param string $clientId
+     * @param string $clientSecret
+     * @param string $redirectUri
+     * @param array $scopes
+     * @return void
+     */
+    public function createOauth2Service(
+        string $applicationName,
+        string $clientId,
+        string $clientSecret,
+        string $redirectUri,
+        array $scopes = ['email', 'profile', 'openid'],
+    ): void
+    {
+        $this->client->setApplicationName($applicationName);
+        $this->client->setClientId($clientId);
+        $this->client->setClientSecret($clientSecret);
+        $this->client->setRedirectUri($redirectUri);
+        $this->client->addScope($scopes);
+
+        $this->oauth2 = new Oauth2($this->client);
     }
 
     /**
