@@ -7,13 +7,12 @@ use Google\Service\Calendar\Event;
 use Google\Service\Exception;
 
 /**
- * Class GoogleApiCalendar (PHP version 8.3)
+ * Class GoogleApiCalendar (PHP version 8.4)
  *
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 1.0.0
- * @lastmodified 2024-10-10
+ * @version 2024.11.28.0
  * @package Tigress\GoogleApiCalendar
  */
 class GoogleApiCalendar extends GoogleApiAuth
@@ -25,7 +24,7 @@ class GoogleApiCalendar extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '1.0.0';
+        return '2024.11.28';
     }
 
     /**
@@ -59,7 +58,7 @@ class GoogleApiCalendar extends GoogleApiAuth
         string $startDate,
         string $endDate,
         string $locationAddress,
-        string $locationName = null
+        ?string $locationName = null
     ): Event
     {
         $data = [

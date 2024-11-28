@@ -8,13 +8,12 @@ use Google\Service\Drive\Permission;
 use Google\Service\Exception;
 
 /**
- * Class GoogleApiDrive (PHP version 8.3)
+ * Class GoogleApiDrive (PHP version 8.4)
  *
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 1.0.0
- * @lastmodified 2024-10-10
+ * @version 2024.11.28.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -26,7 +25,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '1.0.0';
+        return '2024.11.28';
     }
 
     /**
@@ -58,7 +57,7 @@ class GoogleApiDrive extends GoogleApiAuth
         string $permission = 'reader',
         string $postName = 'upload',
         string $fileName = '',
-        string $userAccount = null
+        ?string $userAccount = null
     ): ?array
     {
         if (is_array($_FILES[$postName]['name'])) {
@@ -132,7 +131,7 @@ class GoogleApiDrive extends GoogleApiAuth
         $contents,
         string $mimeType,
         string $permission,
-        string $userAccount = null
+        ?string $userAccount = null
     ): string
     {
         $service = new Drive($this->client);
@@ -184,7 +183,7 @@ class GoogleApiDrive extends GoogleApiAuth
         $template,
         $fileName,
         string $folderId,
-        string $userAccount = null,
+        ?string $userAccount = null,
         string $mimeType = 'application/vnd.google-apps.document',
         string $permission = 'reader'
     ): string
@@ -244,10 +243,10 @@ class GoogleApiDrive extends GoogleApiAuth
      * @throws Exception
      */
     public function createPDF(
-        string $googleFileId,
-        string $folderId,
-        string $userAccount = null,
-        string $permission = 'reader'
+        string  $googleFileId,
+        string  $folderId,
+        ?string $userAccount = null,
+        string  $permission = 'reader'
     ): string
     {
         $service = new Drive($this->client);
