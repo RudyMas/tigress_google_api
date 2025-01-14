@@ -10,9 +10,9 @@ use Google\Service\Exception;
  * Class GoogleApiCalendar (PHP version 8.4)
  *
  * @author Rudy Mas <rudy.mas@rudymas.be>
- * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
+ * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2024.11.28.0
+ * @version 2025.01.14.0
  * @package Tigress\GoogleApiCalendar
  */
 class GoogleApiCalendar extends GoogleApiAuth
@@ -24,7 +24,7 @@ class GoogleApiCalendar extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2024.11.28';
+        return '2025.01.14';
     }
 
     /**
@@ -34,7 +34,7 @@ class GoogleApiCalendar extends GoogleApiAuth
      * @param string $credentialsPath
      * @return void
      */
-    public function config(string $authConfigPath, string $credentialsPath): void
+    public function config(string $authConfigPath, string $credentialsPath = ''): void
     {
         $this->setAuthConfigPath($authConfigPath);
         $this->setCredentialsPath($credentialsPath);
