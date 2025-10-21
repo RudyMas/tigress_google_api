@@ -13,7 +13,7 @@ use Google\Service\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.01.14.0
+ * @version 2025.10.21.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -25,7 +25,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2025.01.14';
+        return '2025.10.21';
     }
 
     /**
@@ -39,6 +39,167 @@ class GoogleApiDrive extends GoogleApiAuth
     {
         $this->setAuthConfigPath($authConfigPath);
         $this->setCredentialsPath($credentialsPath);
+    }
+
+    /**
+     * Execute the copy file request to Google Drive.
+     *
+     * @param $template
+     * @param $fileName
+     * @param string $folderId
+     * @param string|null $userAccount
+     * @param string $mimeType
+     * @param string $permission
+     * @return string
+     * @throws Exception
+     */
+    public function copyGoogle(
+        $template,
+        $fileName,
+        string $folderId,
+        ?string $userAccount = null,
+        string $mimeType = 'application/vnd.google-apps.document',
+        string $permission = 'reader'
+    ): string
+    {
+        $service = new Drive($this->client);
+
+        $fileMetadata = new DriveFile([
+            'name' => $fileName,
+            'parents' => [$folderId],
+            'mimeType' => $mimeType
+        ]);
+
+        $file = $service->files->copy($template, $fileMetadata, [
+            'fields' => 'id'
+        ]);
+
+        if (is_null($userAccount)) {
+            $userPermission = new Permission([
+                'type' => 'anyone',
+                'role' => $permission
+            ]);
+        } else {
+            $userPermission = new Permission([
+                'type' => 'user',
+                'role' => $permission,
+                'emailAddress' => $userAccount
+            ]);
+        }
+
+        $service->permissions->create($file->id, $userPermission, ['fields' => 'id']);
+
+        $file = $service->files->get($file->id, ['fields' => 'webViewLink']);
+        return $file->webViewLink;
+    }
+
+    /**
+     * Execute the create PDF request to Google Drive.
+     *
+     * @param string $googleFileId
+     * @param string $folderId
+     * @param string|null $userAccount
+     * @param string $permission
+     * @return string
+     * @throws Exception
+     */
+    public function createPDF(
+        string  $googleFileId,
+        string  $folderId,
+        ?string $userAccount = null,
+        string  $permission = 'reader'
+    ): string
+    {
+        $service = new Drive($this->client);
+        $file = $service->files->get($googleFileId);
+        $fileName = $file->getName();
+
+        $file = $service->files->export($googleFileId, 'application/pdf', [
+            'alt' => 'media'
+        ]);
+        $content = $file->getBody()->getContents();
+
+        $fileMetadata = new DriveFile([
+            'name' => $fileName,
+            'parents' => [$folderId],
+            'mimeType' => 'application/pdf'
+        ]);
+
+        $file = $service->files->create($fileMetadata, [
+            'data' => $content,
+            'mimeType' => 'application/pdf',
+            'uploadType' => 'multipart',
+            'fields' => 'id'
+        ]);
+
+        $fileId = $file->id;
+
+        if (is_null($userAccount)) {
+            $userPermission = new Permission([
+                'type' => 'anyone',
+                'role' => $permission
+            ]);
+        } else {
+            $userPermission = new Permission([
+                'type' => 'user',
+                'role' => $permission,
+                'emailAddress' => $userAccount
+            ]);
+        }
+
+        $request = $service->permissions->create(
+            $fileId,
+            $userPermission,
+            ['fields' => 'id']
+        );
+
+        $file = $service->files->get($fileId, ['fields' => 'webViewLink']);
+        return $file->webViewLink;
+    }
+
+    /**
+     * Execute the delete file request to Google Drive.
+     *
+     * @param string $googleFileId
+     * @return void
+     * @throws Exception
+     */
+    public function deleteGoogle(string $googleFileId): void
+    {
+        $service = new Drive($this->client);
+        $service->files->delete($googleFileId);
+    }
+
+    /**
+     * Execute the list files request for a specific folder.
+     *
+     * @param string $folderId
+     * @return array
+     * @throws Exception
+     */
+    public function listFiles(string $folderId): array
+    {
+        $service = new Drive($this->client);
+
+        $query = sprintf("'%s' in parents and trashed = false", $folderId);
+        $response = $service->files->listFiles([
+            'q' => $query,
+            'fields' => 'files(id, iconLink, name, size, mimeType, webViewLink)'
+        ]);
+
+        $files = [];
+        foreach ($response->files as $file) {
+            $files[] = [
+                'id' => $file->id,
+                'iconLink' => $file->iconLink,
+                'name' => $file->name,
+                'size' => $file->size,
+                'mimeType' => $file->mimeType,
+                'webViewLink' => $file->webViewLink
+            ];
+        }
+
+        return $files;
     }
 
     /**
@@ -164,135 +325,6 @@ class GoogleApiDrive extends GoogleApiAuth
         $service->permissions->create($file->id, $userPermission, ['fields' => 'id']);
 
         $file = $service->files->get($file->id, ['fields' => 'webViewLink']);
-        return $file->webViewLink;
-    }
-
-    /**
-     * Execute the copy file request to Google Drive.
-     *
-     * @param $template
-     * @param $fileName
-     * @param string $folderId
-     * @param string|null $userAccount
-     * @param string $mimeType
-     * @param string $permission
-     * @return string
-     * @throws Exception
-     */
-    public function copyGoogle(
-        $template,
-        $fileName,
-        string $folderId,
-        ?string $userAccount = null,
-        string $mimeType = 'application/vnd.google-apps.document',
-        string $permission = 'reader'
-    ): string
-    {
-        $service = new Drive($this->client);
-
-        $fileMetadata = new DriveFile([
-            'name' => $fileName,
-            'parents' => [$folderId],
-            'mimeType' => $mimeType
-        ]);
-
-        $file = $service->files->copy($template, $fileMetadata, [
-            'fields' => 'id'
-        ]);
-
-        if (is_null($userAccount)) {
-            $userPermission = new Permission([
-                'type' => 'anyone',
-                'role' => $permission
-            ]);
-        } else {
-            $userPermission = new Permission([
-                'type' => 'user',
-                'role' => $permission,
-                'emailAddress' => $userAccount
-            ]);
-        }
-
-        $service->permissions->create($file->id, $userPermission, ['fields' => 'id']);
-
-        $file = $service->files->get($file->id, ['fields' => 'webViewLink']);
-        return $file->webViewLink;
-    }
-
-    /**
-     * Execute the delete file request to Google Drive.
-     *
-     * @param string $googleFileId
-     * @return void
-     * @throws Exception
-     */
-    public function deleteGoogle(string $googleFileId): void
-    {
-        $service = new Drive($this->client);
-        $service->files->delete($googleFileId);
-    }
-
-    /**
-     * Execute the create PDF request to Google Drive.
-     *
-     * @param string $googleFileId
-     * @param string $folderId
-     * @param string|null $userAccount
-     * @param string $permission
-     * @return string
-     * @throws Exception
-     */
-    public function createPDF(
-        string  $googleFileId,
-        string  $folderId,
-        ?string $userAccount = null,
-        string  $permission = 'reader'
-    ): string
-    {
-        $service = new Drive($this->client);
-        $file = $service->files->get($googleFileId);
-        $fileName = $file->getName();
-
-        $file = $service->files->export($googleFileId, 'application/pdf', [
-            'alt' => 'media'
-        ]);
-        $content = $file->getBody()->getContents();
-
-        $fileMetadata = new DriveFile([
-            'name' => $fileName,
-            'parents' => [$folderId],
-            'mimeType' => 'application/pdf'
-        ]);
-
-        $file = $service->files->create($fileMetadata, [
-            'data' => $content,
-            'mimeType' => 'application/pdf',
-            'uploadType' => 'multipart',
-            'fields' => 'id'
-        ]);
-
-        $fileId = $file->id;
-
-        if (is_null($userAccount)) {
-            $userPermission = new Permission([
-                'type' => 'anyone',
-                'role' => $permission
-            ]);
-        } else {
-            $userPermission = new Permission([
-                'type' => 'user',
-                'role' => $permission,
-                'emailAddress' => $userAccount
-            ]);
-        }
-
-        $request = $service->permissions->create(
-            $fileId,
-            $userPermission,
-            ['fields' => 'id']
-        );
-
-        $file = $service->files->get($fileId, ['fields' => 'webViewLink']);
         return $file->webViewLink;
     }
 }
