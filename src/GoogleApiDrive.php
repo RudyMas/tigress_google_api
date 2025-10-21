@@ -13,7 +13,7 @@ use Google\Service\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.10.21.0
+ * @version 2025.10.21.1
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -174,30 +174,76 @@ class GoogleApiDrive extends GoogleApiAuth
      * Execute the list files request for a specific folder.
      *
      * @param string $folderId
+     * @param string $fields
+     * @param string $orderBy
+     * @param string $query
+     * @param bool   $includeFolders
+     * @param bool   $includeShortcuts
      * @return array
      * @throws Exception
      */
-    public function listFiles(string $folderId): array
+    public function listFiles(
+        string $folderId,
+        string $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description',
+        string $orderBy = 'folder,name',
+        string $query = '',
+        bool   $includeFolders = false,
+        bool   $includeShortcuts = false,
+    ): array
     {
         $service = new Drive($this->client);
 
-        $query = sprintf("'%s' in parents and trashed = false", $folderId);
-        $response = $service->files->listFiles([
-            'q' => $query,
-            'fields' => 'files(id, iconLink, name, size, mimeType, webViewLink)'
-        ]);
+        // Build query
+        $q = !empty($query) ? $query : sprintf("'%s' in parents and trashed = false", $folderId);
+
+        // Extract the field names to build the output array
+        $keys = [];
+        preg_match_all('/\b(\w+)\b/', $fields, $matches);
+        if (isset($matches[1])) {
+            $keys = $matches[1];
+        }
 
         $files = [];
-        foreach ($response->files as $file) {
-            $files[] = [
-                'id' => $file->id,
-                'iconLink' => $file->iconLink,
-                'name' => $file->name,
-                'size' => $file->size,
-                'mimeType' => $file->mimeType,
-                'webViewLink' => $file->webViewLink
+        $pageToken = null;
+
+        do {
+            $params = [
+                'q'        => $q,
+                'fields'   => "nextPageToken, files({$fields})",
+                'orderBy'  => $orderBy,
+                'pageSize' => 1000, // optional: can be adjusted (max 1000)
             ];
-        }
+
+            if ($pageToken) {
+                $params['pageToken'] = $pageToken;
+            }
+
+            $response = $service->files->listFiles($params);
+
+            // Uncomment for debugging if needed
+            // Core::dump($response);
+
+            foreach ($response->getFiles() as $file) {
+                // Skip folders or shortcuts based on flags
+                if (isset($file->mimeType)) {
+                    if ($file->mimeType === 'application/vnd.google-apps.folder' && !$includeFolders) {
+                        continue;
+                    }
+                    if ($file->mimeType === 'application/vnd.google-apps.shortcut' && !$includeShortcuts) {
+                        continue;
+                    }
+                }
+
+                $values = [];
+                foreach ($keys as $key) {
+                    $values[$key] = $file->$key ?? null;
+                }
+                $files[] = $values;
+            }
+
+            // Get the next page token (if any)
+            $pageToken = $response->getNextPageToken();
+        } while ($pageToken !== null);
 
         return $files;
     }
@@ -214,10 +260,10 @@ class GoogleApiDrive extends GoogleApiAuth
      * @throws Exception
      */
     public function uploadFile(
-        string $folderId,
-        string $permission = 'reader',
-        string $postName = 'upload',
-        string $fileName = '',
+        string  $folderId,
+        string  $permission = 'reader',
+        string  $postName = 'upload',
+        string  $fileName = '',
         ?string $userAccount = null
     ): ?array
     {
