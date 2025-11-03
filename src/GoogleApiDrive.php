@@ -13,7 +13,7 @@ use Google\Service\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.10.21.1
+ * @version 2025.11.03.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -44,8 +44,8 @@ class GoogleApiDrive extends GoogleApiAuth
     /**
      * Execute the copy file request to Google Drive.
      *
-     * @param $template
-     * @param $fileName
+     * @param string $template
+     * @param string $fileName
      * @param string $folderId
      * @param string|null $userAccount
      * @param string $mimeType
@@ -54,43 +54,103 @@ class GoogleApiDrive extends GoogleApiAuth
      * @throws Exception
      */
     public function copyGoogle(
-        $template,
-        $fileName,
-        string $folderId,
-        ?string $userAccount = null,
+        string $template,                 // source fileId (can be a shortcut)
+        string $fileName,
+        string $folderId,                 // destination folderId
+        ?string $userAccount = null,      // if null -> link for anyone, else share to this user
         string $mimeType = 'application/vnd.google-apps.document',
-        string $permission = 'reader'
+        string $permission = 'reader'     // 'reader' | 'commenter' | 'writer'
     ): string
     {
         $service = new Drive($this->client);
 
-        $fileMetadata = new DriveFile([
-            'name' => $fileName,
-            'parents' => [$folderId],
-            'mimeType' => $mimeType
+        // For the initial source lookup (may be a shortcut)
+        $src = $service->files->get($template, [
+            'fields' => 'id,name,mimeType,trashed,shortcutDetails,driveId,capabilities',
+            'supportsAllDrives' => true,
         ]);
 
-        $file = $service->files->copy($template, $fileMetadata, [
-            'fields' => 'id'
-        ]);
-
-        if (is_null($userAccount)) {
-            $userPermission = new Permission([
-                'type' => 'anyone',
-                'role' => $permission
-            ]);
-        } else {
-            $userPermission = new Permission([
-                'type' => 'user',
-                'role' => $permission,
-                'emailAddress' => $userAccount
+        // If it's a shortcut, follow it
+        if ($src->getMimeType() === 'application/vnd.google-apps.shortcut') {
+            $targetId = $src->getShortcutDetails()->getTargetId();
+            if (!$targetId) {
+                throw new Exception('Shortcut has no targetId.');
+            }
+            $src = $service->files->get($targetId, [
+                'fields' => 'id,name,mimeType,trashed,driveId,capabilities',
+                'supportsAllDrives' => true,
             ]);
         }
 
-        $service->permissions->create($file->id, $userPermission, ['fields' => 'id']);
+        if ($src->getTrashed()) {
+            throw new Exception('Source file is in the trash.');
+        }
+        if ($src->getCapabilities() && $src->getCapabilities()->canCopy === false) {
+            throw new Exception('You do not have permission to copy this file.');
+        }
 
-        $file = $service->files->get($file->id, ['fields' => 'webViewLink']);
-        return $file->webViewLink;
+        // Validate destination folder
+        $dest = $service->files->get($folderId, [
+            'fields' => 'id,mimeType,trashed,driveId,capabilities',
+            'supportsAllDrives' => true,
+        ]);
+
+        if ($dest->getTrashed()) {
+            throw new Exception('Destination folder is in the trash.');
+        }
+        if ($dest->getMimeType() !== 'application/vnd.google-apps.folder') {
+            throw new Exception('Destination is not a folder.');
+        }
+        if ($dest->getCapabilities() && $dest->getCapabilities()->canAddChildren === false) {
+            throw new Exception('No permission to add files to the destination folder.');
+        }
+
+        // Do the copy (mimeType in copy body is ignored for Google files; harmless)
+        $fileMetadata = new DriveFile([
+            'name' => $fileName,
+            'parents' => [$folderId],
+            // Setting mimeType here does nothing for Google Docs; kept for parity with your signature
+            'mimeType' => $mimeType,
+        ]);
+
+        $copied = $service->files->copy($src->getId(), $fileMetadata, [
+            'fields' => 'id,name,parents,webViewLink',
+            'supportsAllDrives' => true,
+        ]);
+
+        // Optional sharing
+        if ($userAccount === null) {
+            // Public link (anyone with link)
+            $perm = new Permission([
+                'type' => 'anyone',
+                'role' => $permission,
+            ]);
+        } else {
+            // Share to a specific user
+            $perm = new Permission([
+                'type' => 'user',
+                'role' => $permission,
+                'emailAddress' => $userAccount,
+            ]);
+        }
+
+        // Note: includeItemsFromAllDrives is not needed for permissions, but harmless
+        $service->permissions->create($copied->id, $perm, [
+            'fields' => 'id',
+            'sendNotificationEmail' => false,
+            'supportsAllDrives' => true,
+        ]);
+
+        // Return the webViewLink
+        // (Ask for it in the copy call already; re-get only if missing)
+        if (!$copied->getWebViewLink()) {
+            $copied = $service->files->get($copied->id, [
+                'fields' => 'webViewLink',
+                'supportsAllDrives' => true,
+            ]);
+        }
+
+        return $copied->getWebViewLink();
     }
 
     /**
@@ -156,7 +216,6 @@ class GoogleApiDrive extends GoogleApiAuth
         $file = $service->files->get($fileId, ['fields' => 'webViewLink']);
         return $file->webViewLink;
     }
-
     /**
      * Execute the delete file request to Google Drive.
      *
@@ -167,7 +226,53 @@ class GoogleApiDrive extends GoogleApiAuth
     public function deleteGoogle(string $googleFileId): void
     {
         $service = new Drive($this->client);
-        $service->files->delete($googleFileId);
+
+        try {
+            // 1) Get the file metadata (handles shortcuts)
+            $file = $service->files->get($googleFileId, [
+                'fields' => 'id,name,mimeType,trashed,shortcutDetails',
+                'supportsAllDrives' => true,
+            ]);
+
+            // Resolve shortcut → target
+            if ($file->getMimeType() === 'application/vnd.google-apps.shortcut') {
+                $targetId = $file->getShortcutDetails()->getTargetId();
+                if ($targetId) {
+                    $file = $service->files->get($targetId, [
+                        'fields' => 'id,name,mimeType,trashed',
+                        'supportsAllDrives' => true,
+                    ]);
+                }
+            }
+
+            // 2) If already trashed, permanently delete it
+            if ($file->getTrashed()) {
+                $service->files->delete($file->getId(), [
+                    'supportsAllDrives' => true,
+                ]);
+                return;
+            }
+
+            // 3) Otherwise, move to trash first
+            $service->files->update($file->getId(), new \Google\Service\Drive\DriveFile([
+                'trashed' => true,
+            ]), [
+                'supportsAllDrives' => true,
+            ]);
+
+            // 4) Optional: permanently delete (uncomment if you always want that)
+            // $service->files->delete($file->getId(), [
+            //     'supportsAllDrives' => true,
+            // ]);
+
+        } catch (\Google\Service\Exception $e) {
+            if ($e->getCode() === 404) {
+                throw new Exception('File not found or access denied.');
+            }
+            throw new Exception('Google Drive API error: ' . $e->getMessage());
+        } catch (\Exception $e) {
+            throw new Exception('Delete operation failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -212,6 +317,8 @@ class GoogleApiDrive extends GoogleApiAuth
                 'fields'   => "nextPageToken, files({$fields})",
                 'orderBy'  => $orderBy,
                 'pageSize' => 1000, // optional: can be adjusted (max 1000)
+                'supportsAllDrives' => true,
+                'includeItemsFromAllDrives' => true,
             ];
 
             if ($pageToken) {
