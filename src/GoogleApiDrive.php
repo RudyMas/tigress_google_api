@@ -13,7 +13,7 @@ use Google\Service\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.11.03.0
+ * @version 2025.11.24.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -25,7 +25,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2025.10.21';
+        return '2025.11.24';
     }
 
     /**
@@ -189,7 +189,8 @@ class GoogleApiDrive extends GoogleApiAuth
             'data' => $content,
             'mimeType' => 'application/pdf',
             'uploadType' => 'multipart',
-            'fields' => 'id'
+            'fields' => 'id',
+            'supportsAllDrives' => true,
         ]);
 
         $fileId = $file->id;
@@ -213,7 +214,10 @@ class GoogleApiDrive extends GoogleApiAuth
             ['fields' => 'id']
         );
 
-        $file = $service->files->get($fileId, ['fields' => 'webViewLink']);
+        $file = $service->files->get($fileId, [
+            'fields' => 'webViewLink',
+            'supportsAllDrives' => true,
+        ]);
         return $file->webViewLink;
     }
     /**
@@ -459,7 +463,8 @@ class GoogleApiDrive extends GoogleApiAuth
             'data' => file_get_contents($contents),
             'mimeType' => $mimeType,
             'uploadType' => 'multipart',
-            'fields' => 'id'
+            'fields' => 'id',
+            'supportsAllDrives' => true,
         ]);
 
         if (is_null($userAccount)) {
@@ -475,9 +480,15 @@ class GoogleApiDrive extends GoogleApiAuth
             ]);
         }
 
-        $service->permissions->create($file->id, $userPermission, ['fields' => 'id']);
+        $service->permissions->create($file->id, $userPermission, [
+            'fields' => 'id',
+            'supportsAllDrives' => true,
+        ]);
 
-        $file = $service->files->get($file->id, ['fields' => 'webViewLink']);
+        $file = $service->files->get($file->id, [
+            'fields' => 'webViewLink',
+            'supportsAllDrives' => true,
+        ]);
         return $file->webViewLink;
     }
 }
