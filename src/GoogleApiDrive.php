@@ -2,10 +2,11 @@
 
 namespace Tigress;
 
+use Exception;
 use Google\Service\Drive;
 use Google\Service\Drive\DriveFile;
 use Google\Service\Drive\Permission;
-use Google\Service\Exception;
+use Google\Service\Exception as GoogleServiceException;
 
 /**
  * Class GoogleApiDrive (PHP version 8.4)
@@ -13,7 +14,7 @@ use Google\Service\Exception;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.11.24.0
+ * @version 2025.11.25.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -25,7 +26,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2025.11.24';
+        return '2025.11.25';
     }
 
     /**
@@ -54,12 +55,12 @@ class GoogleApiDrive extends GoogleApiAuth
      * @throws Exception
      */
     public function copyGoogle(
-        string $template,                 // source fileId (can be a shortcut)
-        string $fileName,
-        string $folderId,                 // destination folderId
+        string  $template,                 // source fileId (can be a shortcut)
+        string  $fileName,
+        string  $folderId,                 // destination folderId
         ?string $userAccount = null,      // if null -> link for anyone, else share to this user
-        string $mimeType = 'application/vnd.google-apps.document',
-        string $permission = 'reader'     // 'reader' | 'commenter' | 'writer'
+        string  $mimeType = 'application/vnd.google-apps.document',
+        string  $permission = 'reader'     // 'reader' | 'commenter' | 'writer'
     ): string
     {
         $service = new Drive($this->client);
@@ -85,7 +86,9 @@ class GoogleApiDrive extends GoogleApiAuth
         if ($src->getTrashed()) {
             throw new Exception('Source file is in the trash.');
         }
-        if ($src->getCapabilities() && $src->getCapabilities()->canCopy === false) {
+
+        $cap = $src->getCapabilities();
+        if ($cap && method_exists($cap, 'getCanCopy') && $cap->getCanCopy() === false) {
             throw new Exception('You do not have permission to copy this file.');
         }
 
@@ -171,7 +174,9 @@ class GoogleApiDrive extends GoogleApiAuth
     ): string
     {
         $service = new Drive($this->client);
-        $file = $service->files->get($googleFileId);
+        $file = $service->files->get($googleFileId, [
+            'supportsAllDrives' => true,
+        ]);
         $fileName = $file->getName();
 
         $file = $service->files->export($googleFileId, 'application/pdf', [
@@ -211,7 +216,10 @@ class GoogleApiDrive extends GoogleApiAuth
         $request = $service->permissions->create(
             $fileId,
             $userPermission,
-            ['fields' => 'id']
+            [
+                'fields' => 'id',
+                'supportsAllDrives' => true,
+            ]
         );
 
         $file = $service->files->get($fileId, [
@@ -220,25 +228,25 @@ class GoogleApiDrive extends GoogleApiAuth
         ]);
         return $file->webViewLink;
     }
+
     /**
      * Execute the delete file request to Google Drive.
      *
      * @param string $googleFileId
+     * @param bool $hardDelete
      * @return void
      * @throws Exception
      */
-    public function deleteGoogle(string $googleFileId): void
+    public function deleteGoogle(string $googleFileId, bool $hardDelete = false): void
     {
         $service = new Drive($this->client);
 
         try {
-            // 1) Get the file metadata (handles shortcuts)
             $file = $service->files->get($googleFileId, [
                 'fields' => 'id,name,mimeType,trashed,shortcutDetails',
                 'supportsAllDrives' => true,
             ]);
 
-            // Resolve shortcut → target
             if ($file->getMimeType() === 'application/vnd.google-apps.shortcut') {
                 $targetId = $file->getShortcutDetails()->getTargetId();
                 if ($targetId) {
@@ -249,7 +257,6 @@ class GoogleApiDrive extends GoogleApiAuth
                 }
             }
 
-            // 2) If already trashed, permanently delete it
             if ($file->getTrashed()) {
                 $service->files->delete($file->getId(), [
                     'supportsAllDrives' => true,
@@ -257,24 +264,24 @@ class GoogleApiDrive extends GoogleApiAuth
                 return;
             }
 
-            // 3) Otherwise, move to trash first
-            $service->files->update($file->getId(), new \Google\Service\Drive\DriveFile([
+            $service->files->update($file->getId(), new DriveFile([
                 'trashed' => true,
             ]), [
                 'supportsAllDrives' => true,
             ]);
 
-            // 4) Optional: permanently delete (uncomment if you always want that)
-            // $service->files->delete($file->getId(), [
-            //     'supportsAllDrives' => true,
-            // ]);
+            if ($hardDelete) {
+                $service->files->delete($file->getId(), [
+                    'supportsAllDrives' => true,
+                ]);
+            }
 
-        } catch (\Google\Service\Exception $e) {
+        } catch (GoogleServiceException $e) {
             if ($e->getCode() === 404) {
                 throw new Exception('File not found or access denied.');
             }
             throw new Exception('Google Drive API error: ' . $e->getMessage());
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             throw new Exception('Delete operation failed: ' . $e->getMessage());
         }
     }
@@ -286,8 +293,8 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $fields
      * @param string $orderBy
      * @param string $query
-     * @param bool   $includeFolders
-     * @param bool   $includeShortcuts
+     * @param bool $includeFolders
+     * @param bool $includeShortcuts
      * @return array
      * @throws Exception
      */
@@ -317,9 +324,9 @@ class GoogleApiDrive extends GoogleApiAuth
 
         do {
             $params = [
-                'q'        => $q,
-                'fields'   => "nextPageToken, files({$fields})",
-                'orderBy'  => $orderBy,
+                'q' => $q,
+                'fields' => "nextPageToken, files({$fields})",
+                'orderBy' => $orderBy,
                 'pageSize' => 1000, // optional: can be adjusted (max 1000)
                 'supportsAllDrives' => true,
                 'includeItemsFromAllDrives' => true,
