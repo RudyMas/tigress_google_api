@@ -9,12 +9,12 @@ use Google\Service\Drive\Permission;
 use Google\Service\Exception as GoogleServiceException;
 
 /**
- * Class GoogleApiDrive (PHP version 8.4)
+ * Class GoogleApiDrive (PHP version 8.5)
  *
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.12.11.0
+ * @version 2025.12.11.1
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -154,6 +154,66 @@ class GoogleApiDrive extends GoogleApiAuth
         }
 
         return $copied->getWebViewLink();
+    }
+
+    /**
+     * Execute the create Google Document request to Google Drive.
+     *
+     * @param string $fileName
+     * @param string $folderId
+     * @param string|null $userAccount
+     * @param string $permission
+     * @return string
+     * @throws GoogleServiceException
+     */
+    public function createGoogleDocument(
+        string $fileName,
+        string $folderId,
+        ?string $userAccount = null,
+        string $permission = 'reader'
+    ): string
+    {
+        return $this->createGoogleFile($fileName, $folderId, 'application/vnd.google-apps.document', $userAccount, $permission);
+    }
+
+    /**
+     * Execute the create Google Spreadsheet request to Google Drive.
+     *
+     * @param string $fileName
+     * @param string $folderId
+     * @param string|null $userAccount
+     * @param string $permission
+     * @return string
+     * @throws GoogleServiceException
+     */
+    public function createGoogleSpreadsheet(
+        string $fileName,
+        string $folderId,
+        ?string $userAccount = null,
+        string $permission = 'reader'
+    ): string
+    {
+        return $this->createGoogleFile($fileName, $folderId, 'application/vnd.google-apps.spreadsheet', $userAccount, $permission);
+    }
+
+    /**
+     * Execute the create Google Spreadsheet request to Google Drive.
+     *
+     * @param string $fileName
+     * @param string $folderId
+     * @param string|null $userAccount
+     * @param string $permission
+     * @return string
+     * @throws GoogleServiceException
+     */
+    public function createGoogleSlides(
+        string $fileName,
+        string $folderId,
+        ?string $userAccount = null,
+        string $permission = 'reader'
+    ): string
+    {
+        return $this->createGoogleFile($fileName, $folderId, 'application/vnd.google-apps.presentation', $userAccount, $permission);
     }
 
     /**
@@ -477,6 +537,56 @@ class GoogleApiDrive extends GoogleApiAuth
             'data' => file_get_contents($contents),
             'mimeType' => $mimeType,
             'uploadType' => 'multipart',
+            'fields' => 'id',
+            'supportsAllDrives' => true,
+        ]);
+
+        if (is_null($userAccount)) {
+            $userPermission = new Permission([
+                'type' => 'anyone',
+                'role' => $permission
+            ]);
+        } else {
+            $userPermission = new Permission([
+                'type' => 'user',
+                'role' => $permission,
+                'emailAddress' => $userAccount
+            ]);
+        }
+
+        $service->permissions->create($file->id, $userPermission, [
+            'fields' => 'id',
+            'supportsAllDrives' => true,
+        ]);
+
+        $file = $service->files->get($file->id, [
+            'fields' => 'webViewLink',
+            'supportsAllDrives' => true,
+        ]);
+        return $file->webViewLink;
+    }
+
+    /**
+     * Execute the create Google File request to Google Drive.
+     *
+     * @param string $fileName
+     * @param string $folderId
+     * @param string $mimeType
+     * @param string|null $userAccount
+     * @param string $permission
+     * @return string
+     * @throws GoogleServiceException
+     */
+    private function createGoogleFile(string $fileName, string $folderId, string $mimeType, ?string $userAccount, string $permission): string
+    {
+        $service = new Drive($this->client);
+        $fileMetadata = new DriveFile([
+            'name' => $fileName,
+            'parents' => [$folderId],
+            'mimeType' => $mimeType
+        ]);
+
+        $file = $service->files->create($fileMetadata, [
             'fields' => 'id',
             'supportsAllDrives' => true,
         ]);
