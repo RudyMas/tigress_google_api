@@ -14,7 +14,7 @@ use Google\Service\Exception as GoogleServiceException;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.11.25.0
+ * @version 2025.12.11.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -26,7 +26,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2025.11.25';
+        return '2025.12.11';
     }
 
     /**
@@ -58,7 +58,7 @@ class GoogleApiDrive extends GoogleApiAuth
         string  $template,                 // source fileId (can be a shortcut)
         string  $fileName,
         string  $folderId,                 // destination folderId
-        ?string $userAccount = null,      // if null -> link for anyone, else share to this user
+        ?string $userAccount = null,       // if null -> link for anyone, else share to this user
         string  $mimeType = 'application/vnd.google-apps.document',
         string  $permission = 'reader'     // 'reader' | 'commenter' | 'writer'
     ): string
@@ -295,8 +295,9 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $query
      * @param bool $includeFolders
      * @param bool $includeShortcuts
+     * @param string $extraInfo
      * @return array
-     * @throws Exception
+     * @throws GoogleServiceException
      */
     public function listFiles(
         string $folderId,
@@ -305,6 +306,7 @@ class GoogleApiDrive extends GoogleApiAuth
         string $query = '',
         bool   $includeFolders = false,
         bool   $includeShortcuts = false,
+        string $extraInfo = ''
     ): array
     {
         $service = new Drive($this->client);
@@ -356,6 +358,11 @@ class GoogleApiDrive extends GoogleApiAuth
                 foreach ($keys as $key) {
                     $values[$key] = $file->$key ?? null;
                 }
+
+                if ($extraInfo) {
+                    $values['extraInfo'] = $extraInfo;
+                }
+
                 $files[] = $values;
             }
 
