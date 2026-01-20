@@ -14,7 +14,7 @@ use Google\Service\Exception as GoogleServiceException;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2026, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2026.01.20.0
+ * @version 2026.01.20.1
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -415,7 +415,7 @@ class GoogleApiDrive extends GoogleApiAuth
                 }
 
                 // Skip file if starts with dot (hidden file)
-                if (isset($file->name) && str_starts_with($file->name, '.')) {
+                if (isset($file->name) && str_starts_with($file->name, '__')) {
                     continue;
                 }
 
