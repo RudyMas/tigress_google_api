@@ -12,9 +12,9 @@ use Google\Service\Exception as GoogleServiceException;
  * Class GoogleApiDrive (PHP version 8.5)
  *
  * @author Rudy Mas <rudy.mas@rudymas.be>
- * @copyright 2024-2025, rudymas.be. (http://www.rudymas.be/)
+ * @copyright 2024-2026, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2025.12.11.1
+ * @version 2026.01.20.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -26,7 +26,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2025.12.11';
+        return '2026.01.20';
     }
 
     /**
@@ -412,6 +412,11 @@ class GoogleApiDrive extends GoogleApiAuth
                     if ($file->mimeType === 'application/vnd.google-apps.shortcut' && !$includeShortcuts) {
                         continue;
                     }
+                }
+
+                // Skip file if starts with dot (hidden file)
+                if (isset($file->name) && str_starts_with($file->name, '.')) {
+                    continue;
                 }
 
                 $values = [];
