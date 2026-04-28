@@ -14,7 +14,7 @@ use Google\Service\Exception as GoogleServiceException;
  * @author Rudy Mas <rudy.mas@rudymas.be>
  * @copyright 2024-2026, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2026.01.20.1
+ * @version 2026.04.27.0
  * @package Tigress\GoogleApiDrive
  */
 class GoogleApiDrive extends GoogleApiAuth
@@ -26,7 +26,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public static function version(): string
     {
-        return '2026.01.20';
+        return '2026.04.27';
     }
 
     /**
@@ -51,8 +51,9 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string|null $userAccount
      * @param string $mimeType
      * @param string $permission
-     * @return string
-     * @throws Exception
+     * @param string $fields
+     * @return DriveFile
+     * @throws GoogleServiceException
      */
     public function copyGoogle(
         string  $template,                 // source fileId (can be a shortcut)
@@ -60,8 +61,9 @@ class GoogleApiDrive extends GoogleApiAuth
         string  $folderId,                 // destination folderId
         ?string $userAccount = null,       // if null -> link for anyone, else share to this user
         string  $mimeType = 'application/vnd.google-apps.document',
-        string  $permission = 'reader'     // 'reader' | 'commenter' | 'writer'
-    ): string
+        string  $permission = 'reader',    // 'reader' | 'commenter' | 'writer'
+        string  $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description, trashed, driveId, capabilities, parents'
+    ): DriveFile
     {
         $service = new Drive($this->client);
 
@@ -117,7 +119,7 @@ class GoogleApiDrive extends GoogleApiAuth
         ]);
 
         $copied = $service->files->copy($src->getId(), $fileMetadata, [
-            'fields' => 'id,name,parents,webViewLink',
+            'fields' => $fields,
             'supportsAllDrives' => true,
         ]);
 
@@ -148,12 +150,12 @@ class GoogleApiDrive extends GoogleApiAuth
         // (Ask for it in the copy call already; re-get only if missing)
         if (!$copied->getWebViewLink()) {
             $copied = $service->files->get($copied->id, [
-                'fields' => 'webViewLink',
+                'fields' => $fields,
                 'supportsAllDrives' => true,
             ]);
         }
 
-        return $copied->getWebViewLink();
+        return $copied;
     }
 
     /**
@@ -163,7 +165,7 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $folderId
      * @param string|null $userAccount
      * @param string $permission
-     * @return string
+     * @return DriveFile
      * @throws GoogleServiceException
      */
     public function createGoogleDocument(
@@ -171,7 +173,7 @@ class GoogleApiDrive extends GoogleApiAuth
         string $folderId,
         ?string $userAccount = null,
         string $permission = 'reader'
-    ): string
+    ): DriveFile
     {
         return $this->createGoogleFile($fileName, $folderId, 'application/vnd.google-apps.document', $userAccount, $permission);
     }
@@ -183,7 +185,7 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $folderId
      * @param string|null $userAccount
      * @param string $permission
-     * @return string
+     * @return DriveFile
      * @throws GoogleServiceException
      */
     public function createGoogleSpreadsheet(
@@ -191,7 +193,7 @@ class GoogleApiDrive extends GoogleApiAuth
         string $folderId,
         ?string $userAccount = null,
         string $permission = 'reader'
-    ): string
+    ): DriveFile
     {
         return $this->createGoogleFile($fileName, $folderId, 'application/vnd.google-apps.spreadsheet', $userAccount, $permission);
     }
@@ -211,7 +213,7 @@ class GoogleApiDrive extends GoogleApiAuth
         string $folderId,
         ?string $userAccount = null,
         string $permission = 'reader'
-    ): string
+    ): DriveFile
     {
         return $this->createGoogleFile($fileName, $folderId, 'application/vnd.google-apps.presentation', $userAccount, $permission);
     }
@@ -223,15 +225,17 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $folderId
      * @param string|null $userAccount
      * @param string $permission
-     * @return string
-     * @throws Exception
+     * @param string $fields
+     * @return DriveFile
+     * @throws GoogleServiceException
      */
     public function createPDF(
         string  $googleFileId,
         string  $folderId,
         ?string $userAccount = null,
-        string  $permission = 'reader'
-    ): string
+        string  $permission = 'reader',
+        string  $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description, trashed, driveId, capabilities, parents'
+    ): DriveFile
     {
         $service = new Drive($this->client);
         $file = $service->files->get($googleFileId, [
@@ -273,7 +277,7 @@ class GoogleApiDrive extends GoogleApiAuth
             ]);
         }
 
-        $request = $service->permissions->create(
+        $service->permissions->create(
             $fileId,
             $userPermission,
             [
@@ -282,11 +286,10 @@ class GoogleApiDrive extends GoogleApiAuth
             ]
         );
 
-        $file = $service->files->get($fileId, [
-            'fields' => 'webViewLink',
+        return $service->files->get($fileId, [
+            'fields' => $fields,
             'supportsAllDrives' => true,
         ]);
-        return $file->webViewLink;
     }
 
     /**
@@ -361,7 +364,7 @@ class GoogleApiDrive extends GoogleApiAuth
      */
     public function listFiles(
         string $folderId,
-        string $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description',
+        string $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description, trashed, driveId, capabilities, parents',
         string $orderBy = 'folder,name',
         string $query = '',
         bool   $includeFolders = false,
@@ -483,7 +486,7 @@ class GoogleApiDrive extends GoogleApiAuth
 
                     $webLinks[] = [
                         'fileName' => $fileName,
-                        'webLink' => $webLink
+                        'webLink' => $webLink->getWebViewLink(),
                     ];
                 }
                 return $webLinks;
@@ -501,7 +504,7 @@ class GoogleApiDrive extends GoogleApiAuth
 
                 $webLinks[] = [
                     'fileName' => $fileName,
-                    'webLink' => $webLink
+                    'webLink' => $webLink->getWebViewLink(),
                 ];
 
                 return $webLinks;
@@ -519,8 +522,9 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $mimeType
      * @param string $permission
      * @param string|null $userAccount
-     * @return string
-     * @throws Exception
+     * @param string $fields
+     * @return DriveFile
+     * @throws GoogleServiceException
      */
     public function uploadGoogle(
         $fileName,
@@ -528,8 +532,9 @@ class GoogleApiDrive extends GoogleApiAuth
         $contents,
         string $mimeType,
         string $permission,
-        ?string $userAccount = null
-    ): string
+        ?string $userAccount = null,
+        string $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description, trashed, driveId, capabilities, parents'
+    ): DriveFile
     {
         $service = new Drive($this->client);
         $fileMetadata = new DriveFile([
@@ -564,11 +569,10 @@ class GoogleApiDrive extends GoogleApiAuth
             'supportsAllDrives' => true,
         ]);
 
-        $file = $service->files->get($file->id, [
-            'fields' => 'webViewLink',
+        return $service->files->get($file->id, [
+            'fields' => $fields,
             'supportsAllDrives' => true,
         ]);
-        return $file->webViewLink;
     }
 
     /**
@@ -579,10 +583,18 @@ class GoogleApiDrive extends GoogleApiAuth
      * @param string $mimeType
      * @param string|null $userAccount
      * @param string $permission
-     * @return string
+     * @param string $fields
+     * @return DriveFile
      * @throws GoogleServiceException
      */
-    private function createGoogleFile(string $fileName, string $folderId, string $mimeType, ?string $userAccount, string $permission): string
+    private function createGoogleFile(
+        string $fileName,
+        string $folderId,
+        string $mimeType,
+        ?string $userAccount,
+        string $permission,
+        string $fields = 'id, iconLink, name, size, mimeType, createdTime, modifiedTime, webViewLink, description, trashed, driveId, capabilities, parents'
+    ): DriveFile
     {
         $service = new Drive($this->client);
         $fileMetadata = new DriveFile([
@@ -614,10 +626,9 @@ class GoogleApiDrive extends GoogleApiAuth
             'supportsAllDrives' => true,
         ]);
 
-        $file = $service->files->get($file->id, [
-            'fields' => 'webViewLink',
+        return $service->files->get($file->id, [
+            'fields' => $fields,
             'supportsAllDrives' => true,
         ]);
-        return $file->webViewLink;
     }
 }
