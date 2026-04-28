@@ -7,12 +7,12 @@ use Google\Service\Script;
 use Google\Service\Script\ExecutionRequest;
 
 /**
- * Class GoogleApiScript (PHP version 8.4)
+ * Class GoogleApiScript (PHP version 8.5)
  *
  * @author Rudy Mas <rudy.mas@rudymas.be>
- * @copyright 2024, rudymas.be. (http://www.rudymas.be/)
+ * @copyright 2024-2026, rudymas.be. (http://www.rudymas.be/)
  * @license https://opensource.org/licenses/GPL-3.0 GNU General Public License, version 3 (GPL-3.0)
- * @version 2024.11.28.0
+ * @version 2026.04.28.0
  * @package Tigress\GoogleApiScript
  */
 class GoogleApiScript extends GoogleApiAuth
@@ -28,6 +28,19 @@ class GoogleApiScript extends GoogleApiAuth
     public static function version(): string
     {
         return '2024.11.28';
+    }
+
+    /**
+     * Set up the connection with the Google Drive API.
+     *
+     * @param string $authConfigPath
+     * @param string $credentialsPath
+     * @return void
+     */
+    public function config(string $authConfigPath, string $credentialsPath = ''): void
+    {
+        $this->setAuthConfigPath($authConfigPath);
+        $this->setCredentialsPath($credentialsPath);
     }
 
     /**
